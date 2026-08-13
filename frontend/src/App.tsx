@@ -319,6 +319,7 @@ function App() {
           </div>
           <nav className="judge-nav" aria-label="Judge links">
             <a href="#borrow">Live demo</a>
+            <a href="/demo/veilcredit-demo.mp4" target="_blank" rel="noreferrer">Video <Play size={10} /></a>
             <a href="#proof">Proof</a>
             <a href={repositoryUrl} target="_blank" rel="noreferrer">Source <ExternalLink size={10} /></a>
             <a href={`${repositoryUrl}/blob/main/docs/THREAT_MODEL.md`} target="_blank" rel="noreferrer">Security <ExternalLink size={10} /></a>
@@ -600,6 +601,19 @@ function App() {
                 <button className="proof-run" onClick={() => setProofRan(true)}>
                   {proofRan ? <><Check size={15} /> Proof complete</> : <><Play size={15} /> Run proof mode</>}
                 </button>
+              </div>
+            </div>
+
+            <div className="judge-video">
+              <video controls preload="metadata" poster="/og-veilcredit.png" aria-label="VeilCredit 77-second judge walkthrough">
+                <source src="/demo/veilcredit-demo.mp4" type="video/mp4" />
+                Your browser does not support MP4 video.
+              </video>
+              <div>
+                <span className="panel__label"><Play size={14} /> 77-second walkthrough</span>
+                <h3>Watch the complete sealed-auction story.</h3>
+                <p>Captioned and silent: private request, three sealed quotes, selective reveal, architecture, and the prototype's exact limits.</p>
+                <a href="/demo/veilcredit-demo.mp4" target="_blank" rel="noreferrer">Open MP4 <ExternalLink size={11} /></a>
               </div>
             </div>
 

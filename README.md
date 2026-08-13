@@ -4,6 +4,8 @@
 
 **Live demo:** https://veilcredit.netlify.app
 
+**77-second video:** https://veilcredit.netlify.app/demo/veilcredit-demo.mp4
+
 **Confidential credit markets for FXRP, built on Flare Confidential Compute.**
 
 VeilCredit is a hackathon prototype for sealed credit underwriting. Its Go extension implements the flow intended for an FCC machine: a borrower submits protected financial inputs, lenders submit private quotes to the same confidential auction, and finalization selectively discloses the chosen terms. Raw borrower data and losing quotes are never returned by the extension or its observable state endpoint.

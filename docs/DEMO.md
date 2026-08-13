@@ -4,7 +4,7 @@ The interactive demo is designed to communicate the product even when a judge do
 
 ## Two-minute walkthrough
 
-1. Use the visible **Live demo · Proof · Source · Security** links to orient the review.
+1. Use the visible **Live demo · Video · Proof · Source · Security** links to orient the review.
 2. Start on **Live demo** and review the default 250,000 FXRP request.
 3. Review the public/protected-field labels and adjust the private maximum APR if desired.
 4. Select **Simulate private request**. The browser-only walkthrough animates the intended encryption flow and three sealed sample quotes.
@@ -27,6 +27,8 @@ The bundled scenario uses:
 The demo does not move real assets or connect to Coston2. The repository's Go extension implements the confidential instruction flow, while the Solidity contract provides the FCC sender and an experimental funding/collateral surface. The UI is a safe, explicitly simulated, no-wallet product walkthrough.
 
 Proof mode does not execute those Go or Solidity tests in the browser. It is a deterministic, sanitized fixture that makes the expected properties visible and maps each one to its exact executable public evidence. VeilCredit is not deployed to Coston2, and the hosted UI does not connect to an FCC TEE.
+
+The hosted demo also serves a 77-second, captioned, silent MP4 walkthrough at `/demo/veilcredit-demo.mp4`. It uses the same browser simulation and makes no live-deployment or real-funds claim.
 
 ## Local execution
 

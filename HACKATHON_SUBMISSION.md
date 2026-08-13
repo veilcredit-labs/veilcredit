@@ -108,6 +108,7 @@ The hosted Netlify experience is an explicitly simulated, browser-only walkthrou
 
 - Repository: **https://github.com/veilcredit-labs/veilcredit**
 - Live demo: **https://veilcredit.netlify.app**
+- 77-second video: **https://veilcredit.netlify.app/demo/veilcredit-demo.mp4**
 - Flare Summer Signal: https://dorahacks.io/hackathon/flaresummersignal
 - FCC developer documentation: https://dev.flare.network/fcc/overview
 - FXRP / FAssets documentation: https://dev.flare.network/fassets/overview

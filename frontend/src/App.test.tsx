@@ -41,9 +41,11 @@ describe('VeilCredit demo', () => {
 
     expect(screen.getByRole('navigation', { name: /judge links/i })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /^live demo$/i })).toHaveAttribute('href', '#borrow')
+    expect(screen.getByRole('link', { name: /^video$/i })).toHaveAttribute('href', '/demo/veilcredit-demo.mp4')
     expect(screen.getByRole('link', { name: /^proof$/i })).toHaveAttribute('href', '#proof')
     expect(screen.getByRole('link', { name: /^source$/i })).toHaveAttribute('href', 'https://github.com/veilcredit-labs/veilcredit')
     expect(screen.getByRole('link', { name: /^security$/i })).toHaveAttribute('href', expect.stringContaining('docs/THREAT_MODEL.md'))
+    expect(screen.getByLabelText(/77-second judge walkthrough/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /run proof mode/i }))
 
