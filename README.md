@@ -1,6 +1,6 @@
 # VeilCredit
 
-**Live demo:** https://veilcredit-fxrp.scalboost179.chatgpt.site
+**Live demo:** https://veilcredit.netlify.app
 
 **Confidential credit markets for FXRP, built on Flare Confidential Compute.**
 

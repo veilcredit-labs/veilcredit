@@ -100,7 +100,7 @@ The official scaffold supplied the FCC transport, registration scripts, and a He
 ## Links
 
 - Repository: **https://github.com/veilcredit-labs/veilcredit**
-- Live demo: **https://veilcredit-fxrp.scalboost179.chatgpt.site**
+- Live demo: **https://veilcredit.netlify.app**
 - Flare Summer Signal: https://dorahacks.io/hackathon/flaresummersignal
 - FCC developer documentation: https://dev.flare.network/fcc/overview
 - FXRP / FAssets documentation: https://dev.flare.network/fassets/overview
