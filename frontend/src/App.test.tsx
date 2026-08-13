@@ -35,4 +35,30 @@ describe('VeilCredit demo', () => {
     expect(screen.getByRole('button', { name: /simulating encrypted brief/i })).toBeDisabled()
     expect(screen.getByText(/browser simulation mirrors the implemented/i)).toBeInTheDocument()
   }, 20_000)
+
+  it('maps judge proof mode to exact public evidence without claiming a live deployment', () => {
+    render(<App />)
+
+    expect(screen.getByRole('navigation', { name: /judge links/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /^live demo$/i })).toHaveAttribute('href', '#borrow')
+    expect(screen.getByRole('link', { name: /^proof$/i })).toHaveAttribute('href', '#proof')
+    expect(screen.getByRole('link', { name: /^source$/i })).toHaveAttribute('href', 'https://github.com/veilcredit-labs/veilcredit')
+    expect(screen.getByRole('link', { name: /^security$/i })).toHaveAttribute('href', expect.stringContaining('docs/THREAT_MODEL.md'))
+
+    fireEvent.click(screen.getByRole('button', { name: /run proof mode/i }))
+
+    expect(screen.getByRole('status')).toHaveTextContent('QUOTE eligible')
+    expect(screen.getByRole('status')).toHaveTextContent('QUOTE ineligible')
+    expect(screen.getByRole('status')).toHaveTextContent('auction still open')
+    expect(screen.getByRole('status')).toHaveTextContent('auction closed')
+    expect(screen.getByRole('status')).toHaveTextContent('bestQuote slots=1')
+    expect(screen.getByRole('status')).toHaveTextContent('requestId, borrower, winningLender, aprBps, amountFxrp, riskTier, commitment, quoteCount')
+    expect(screen.getByText(/this panel is a deterministic browser fixture/i)).toBeInTheDocument()
+    expect(screen.getByText(/not deployed to Coston2/i)).toBeInTheDocument()
+
+    const evidence = screen.getByLabelText(/public implementation evidence/i)
+    expect(evidence.querySelectorAll('a')).toHaveLength(5)
+    expect(screen.getByRole('link', { name: /uniform quote ack/i })).toHaveAttribute('href', expect.stringContaining('extension_test.go#L359-L391'))
+    expect(screen.getByRole('link', { name: /exact finalize disclosure/i })).toHaveAttribute('href', expect.stringContaining('types.go#L100-L111'))
+  }, 20_000)
 })

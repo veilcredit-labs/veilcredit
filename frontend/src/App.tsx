@@ -11,6 +11,8 @@ import {
   Clock3,
   Eye,
   EyeOff,
+  ExternalLink,
+  FileCheck2,
   Fingerprint,
   Gauge,
   Info,
@@ -20,8 +22,10 @@ import {
   LockKeyhole,
   Menu,
   Network,
+  Play,
   ShieldCheck,
   Sparkles,
+  Terminal,
   TrendingUp,
   WalletCards,
   X,
@@ -106,6 +110,49 @@ const steps = [
   { label: 'Private reveal', icon: Eye },
 ]
 
+const repositoryUrl = 'https://github.com/veilcredit-labs/veilcredit'
+
+const proofChecks = [
+  {
+    label: 'Uniform quote ACK',
+    detail: 'Eligible and ineligible bound quotes return the same sanitized acknowledgement.',
+    href: `${repositoryUrl}/blob/main/go/internal/extension/extension_test.go#L359-L391`,
+    evidence: 'Go test',
+  },
+  {
+    label: 'Premature FINALIZE blocked',
+    detail: 'The Solidity sender rejects finalization before the stored per-request close time.',
+    href: `${repositoryUrl}/blob/main/test/VeilCreditInstructionSender.t.sol#L93-L104`,
+    evidence: 'Foundry test',
+  },
+  {
+    label: 'Late QUOTE blocked',
+    detail: 'The same lifecycle test rejects a quote at or after the close boundary.',
+    href: `${repositoryUrl}/blob/main/test/VeilCreditInstructionSender.t.sol#L93-L104`,
+    evidence: 'Foundry test',
+  },
+  {
+    label: 'One best quote retained',
+    detail: 'Each eligible quote can only replace one best pointer under the APR and address tie-break.',
+    href: `${repositoryUrl}/blob/main/go/internal/extension/extension.go#L267-L277`,
+    evidence: 'Go source',
+  },
+  {
+    label: 'Exact FINALIZE disclosure',
+    detail: 'The public response schema is limited to eight named settlement fields.',
+    href: `${repositoryUrl}/blob/main/go/pkg/types/types.go#L100-L111`,
+    evidence: 'Go schema',
+  },
+]
+
+const proofTranscript = [
+  { command: 'QUOTE eligible', result: 'ACK {"requestId":"0x…0248","received":true}', tone: 'pass' },
+  { command: 'QUOTE ineligible', result: 'ACK {"requestId":"0x…0248","received":true}', tone: 'pass' },
+  { command: 'FINALIZE before close', result: 'BLOCKED · "auction still open"', tone: 'blocked' },
+  { command: 'QUOTE after close', result: 'BLOCKED · "auction closed"', tone: 'blocked' },
+  { command: 'RETAIN after 3 eligible quotes', result: 'bestQuote slots=1 · lowest APR retained', tone: 'pass' },
+] as const
+
 const formatCurrency = (value: string) => `$${value.replace(/[^\d,]/g, '') || '0'}`
 
 function BrandMark() {
@@ -122,6 +169,7 @@ function App() {
   const [activeNav, setActiveNav] = useState('Borrow')
   const [mobileMenu, setMobileMenu] = useState(false)
   const [visibleQuotes, setVisibleQuotes] = useState(0)
+  const [proofRan, setProofRan] = useState(false)
 
   const activeStep = useMemo(() => {
     if (status === 'ready' || status === 'encrypting') return 0
@@ -231,6 +279,10 @@ function App() {
             <Blocks size={17} strokeWidth={1.8} />
             <span>Activity</span>
           </button>
+          <button className="nav__item" onClick={() => document.getElementById('proof')?.scrollIntoView({ behavior: 'smooth' })}>
+            <FileCheck2 size={17} strokeWidth={1.8} />
+            <span>Judge proof</span>
+          </button>
         </nav>
 
         <div className="sidebar__bottom">
@@ -265,6 +317,12 @@ function App() {
             <span className="topbar__separator">/</span>
             <span className="topbar__request">Request VC-0248</span>
           </div>
+          <nav className="judge-nav" aria-label="Judge links">
+            <a href="#borrow">Live demo</a>
+            <a href="#proof">Proof</a>
+            <a href={repositoryUrl} target="_blank" rel="noreferrer">Source <ExternalLink size={10} /></a>
+            <a href={`${repositoryUrl}/blob/main/docs/THREAT_MODEL.md`} target="_blank" rel="noreferrer">Security <ExternalLink size={10} /></a>
+          </nav>
           <div className="topbar__actions">
             <span className="demo-badge"><Sparkles size={13} /> Interactive demo</span>
             <button className="wallet-button">
@@ -530,6 +588,77 @@ function App() {
               <button onClick={resetDemo}>Reset demo</button>
             </section>
           )}
+
+          <section className="proof-section" id="proof">
+            <div className="section-heading proof-heading">
+              <div>
+                <div className="eyebrow"><span /> Judge proof</div>
+                <h2>Five privacy claims.<br /><em>One reproducible trail.</em></h2>
+              </div>
+              <div className="proof-heading__action">
+                <p>Run a deterministic, sanitized transcript of the browser scenario, then open the exact public source or test behind every property.</p>
+                <button className="proof-run" onClick={() => setProofRan(true)}>
+                  {proofRan ? <><Check size={15} /> Proof complete</> : <><Play size={15} /> Run proof mode</>}
+                </button>
+              </div>
+            </div>
+
+            <div className={`proof-workbench ${proofRan ? 'proof-workbench--ran' : ''}`}>
+              <div className="proof-terminal" aria-live="polite">
+                <div className="proof-terminal__bar">
+                  <span><Terminal size={14} /> sanitized-proof.log</span>
+                  <span>DETERMINISTIC BROWSER FIXTURE</span>
+                </div>
+                {!proofRan ? (
+                  <button className="proof-terminal__idle" onClick={() => setProofRan(true)}>
+                    <span><Play size={18} /></span>
+                    <strong>Run the five-check judge transcript</strong>
+                    <small>No wallet, network, TEE, or funds are used.</small>
+                  </button>
+                ) : (
+                  <div className="proof-transcript" role="status">
+                    {proofTranscript.map((entry, index) => (
+                      <div className="proof-line" key={entry.command}>
+                        <span className="proof-line__index">0{index + 1}</span>
+                        <span className="proof-line__command">{entry.command}</span>
+                        <code className={`proof-line__result proof-line__result--${entry.tone}`}>{entry.result}</code>
+                      </div>
+                    ))}
+                    <div className="proof-finalize">
+                      <span className="proof-line__index">06</span>
+                      <span>
+                        <strong>FINALIZE selective result</strong>
+                        <code>{'{'} requestId, borrower, winningLender, aprBps, amountFxrp, riskTier, commitment, quoteCount {'}'}</code>
+                        <small>Excluded: revenue, debt, collateral value, APR ceiling, lender liquidity, losing APRs.</small>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="proof-evidence" aria-label="Public implementation evidence">
+                <div className="proof-evidence__header">
+                  <span>Public evidence</span>
+                  <strong>{proofRan ? '5 / 5 mapped' : 'Ready to inspect'}</strong>
+                </div>
+                {proofChecks.map((check) => (
+                  <a href={check.href} target="_blank" rel="noreferrer" className="proof-check" key={check.label}>
+                    <span className="proof-check__status"><Check size={12} /></span>
+                    <span>
+                      <strong>{check.label}</strong>
+                      <small>{check.detail}</small>
+                    </span>
+                    <span className="proof-check__source">{check.evidence} <ExternalLink size={10} /></span>
+                  </a>
+                ))}
+              </div>
+            </div>
+
+            <div className="proof-boundary">
+              <Info size={14} />
+              <span><strong>Evidence boundary:</strong> this panel is a deterministic browser fixture mapped to executable repository tests. VeilCredit is not deployed to Coston2 and this hosted UI does not connect to an FCC TEE.</span>
+            </div>
+          </section>
 
           <section className="privacy-section" id="privacy">
             <div className="section-heading">
