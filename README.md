@@ -1,5 +1,7 @@
 # VeilCredit
 
+[![Verify VeilCredit](https://github.com/veilcredit-labs/veilcredit/actions/workflows/verify.yml/badge.svg)](https://github.com/veilcredit-labs/veilcredit/actions/workflows/verify.yml)
+
 **Live demo:** https://veilcredit.netlify.app
 
 **Confidential credit markets for FXRP, built on Flare Confidential Compute.**

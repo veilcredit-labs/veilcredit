@@ -1,0 +1,82 @@
+name: Verify VeilCredit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go-engine:
+    name: Go FCC engine
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+          cache-dependency-path: go/go.sum
+      - run: go test -count=1 ./...
+      - run: go vet ./...
+      - run: go test -race -count=1 ./internal/extension
+
+  solidity:
+    name: Solidity lifecycle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge build --force --sizes
+      - run: forge test -vv
+
+  go-tools:
+    name: Go tooling and bindings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/go.mod
+          cache-dependency-path: tools/go.sum
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Generate current contract bindings
+        run: ./scripts/generate-bindings.sh
+      - name: Test tooling
+        working-directory: tools
+        run: go test -count=1 ./...
+      - name: Vet tooling
+        working-directory: tools
+        run: go vet ./...
+
+  frontend:
+    name: Frontend walkthrough
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+
+  docs:
+    name: Documentation contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash ./scripts/check-docs.sh

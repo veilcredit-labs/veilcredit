@@ -11,6 +11,7 @@ VeilCredit needs confidential compute because one deterministic policy compares 
 ## Submitted source state
 
 - Repository: <https://github.com/veilcredit-labs/veilcredit>
+- Public CI: <https://github.com/veilcredit-labs/veilcredit/actions/workflows/verify.yml>
 - Submitted base commit: `9bb36fb39faffb56d714becf1aa85d88783a130e`
 - Scaffold-to-project comparison: <https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...9bb36fb>
 - Live walkthrough: <https://veilcredit.netlify.app>
