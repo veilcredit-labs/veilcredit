@@ -1,174 +1,103 @@
-# Hello World Extension
+# VeilCredit
 
-A working Hello World example for building Flare Confidential Compute (FCC) extensions. This repository demonstrates a complete, runnable extension with on-chain contracts, deployment tooling, and registration scripts — everything you need to understand how extensions work on the Flare TEE infrastructure.
+**Confidential credit markets for FXRP, built on Flare Confidential Compute.**
 
-**The same extension is implemented in Go, Python and TypeScript.** Pick one with `LANGUAGE` in `.env`; everything else — contracts, deployment, registration, tests — is identical regardless of choice.
+VeilCredit is a hackathon prototype for sealed credit underwriting. A borrower encrypts financial inputs to a selected FCC machine; lenders encrypt private quotes to the same confidential auction; the extension reveals only the selected lender and clearing terms. Raw borrower data and losing quotes are never returned by the Go extension or its observable state endpoint.
 
-## Choosing a Language
+![VeilCredit social card](frontend/public/og-veilcredit.png)
+
+## Why confidential compute
+
+A transparent credit auction leaks both sides' strategy: the borrower's cash flow and maximum APR, plus every lender's price and liquidity. Moving that logic offchain hides it but introduces an opaque operator. VeilCredit instead runs a deterministic policy and matching engine in an attested TEE while keeping a public onchain instruction and funding boundary.
+
+## Prototype flow
+
+1. `OPEN` decrypts a strict borrower packet, scores it with integer-only deterministic logic, and stores only a sanitized record.
+2. `QUOTE` decrypts a lender bid, applies private eligibility checks, and retains only the current best quote. Losing quote details are discarded.
+3. `FINALIZE` reveals the selected lender, APR, approved FXRP amount, risk tier, commitment, and aggregate quote count.
+4. The FCC runtime signs the enclosing `ActionResult`. The Solidity contract also contains an experimental domain-separated relay and FXRP funding/collateral surface; custom relay-signature generation is not yet connected to the Go handler.
+
+## Repository map
+
+```text
+go/internal/extension/        VeilCredit OPEN / QUOTE / FINALIZE engine
+go/pkg/types/                 encrypted request and selective-disclosure schemas
+contracts/InstructionSender.sol  FCC instruction sender and funding scaffold
+tools/cmd/run-test/           encrypted FCC round-trip runner
+frontend/                     responsive browser-only product walkthrough
+docs/THREAT_MODEL.md          security boundary and residual risks
+docs/DEMO.md                  two-minute demo script
+HACKATHON_SUBMISSION.md       submission-ready project narrative
+```
+
+The **Go implementation is the VeilCredit reference implementation**. The `python/` and `typescript/` directories are retained from Flare's upstream multi-language scaffold as learning references; they still implement the original Hello World example and are not claimed as VeilCredit ports.
+
+## Run the interactive demo
 
 ```bash
-LANGUAGE=go          # default. Smallest image (~22MB distroless), bit-for-bit reproducible
-LANGUAGE=python      # ~268MB. Same-machine reproducible
-LANGUAGE=typescript  # ~472MB. Same-machine reproducible
+cd frontend
+pnpm install
+pnpm dev
 ```
 
-All three implement identical behaviour and are verified against the same golden wire fixtures by `./scripts/test-conformance.sh`. The Go path is the most thoroughly reproducible because it produces a static binary on a distroless base; Python wheels and `node_modules` trees embed build-host variance (see [REPRODUCIBILITY.md](REPRODUCIBILITY.md)).
+The UI is deliberately labeled as a simulation. It uses no wallet, network, or funds, and keeps losing quote terms sealed even after the winner is revealed.
 
-Language selection is **convention-based**: `LANGUAGE=<dir>` is valid iff `<dir>/language.env` exists, so adding a fourth language requires no changes to any script, tool or compose file — you create one directory.
-
-> **→ [Working in Multiple Languages](docs/languages.md)** covers choosing between them, the same handler written three ways, and a step-by-step for adding your own. The normative spec an implementation must satisfy is [docs/extension-contract.md](docs/extension-contract.md).
-
-## Repository Structure
-
-The repo splits into a **language-neutral spine** (contracts, deployment tooling, scripts) and **pluggable language implementations**. You customize one language directory plus the Solidity contract.
-
-```
-├── go/                                 # ── Go implementation
-│   ├── cmd/main.go                     # ★ Extension server entry point (standalone, for dev)
-│   ├── cmd/docker/main.go              # Combined TEE node + extension (single-process image)
-│   ├── cmd/start-tee/main.go           # Host-process runner for --local mode
-│   ├── internal/config/config.go       # ★ OPType constants, version, port defaults
-│   ├── internal/extension/extension.go # ★ MAIN CUSTOMIZATION POINT: processAction routing
-│   ├── internal/extension/utils.go     # Boilerplate: actionHandler, buildResult
-│   ├── pkg/types/types.go              # ★ Request/response types
-│   ├── Dockerfile                      # Single-process image (distroless)
-│   └── language.env                    # Language manifest (marks this dir as an implementation)
-├── python/                             # ── Python implementation
-│   ├── base/                           # Framework: server, wire types, encoding, node client
-│   ├── app/config.py                   # ★ OPType constants and version
-│   ├── app/handlers.py                 # ★ MAIN CUSTOMIZATION POINT: your handlers
-│   ├── app/abi.py                      # ★ ABI decoding for non-JSON payloads
-│   ├── tests/                          # pytest suite
-│   ├── Dockerfile                      # Two-process image (tee-node binary + python)
-│   └── language.env
-├── typescript/                         # ── TypeScript implementation
-│   ├── src/base/                       # Framework: server, wire types, encoding, node client
-│   ├── src/app/config.ts               # ★ OPType constants and version
-│   ├── src/app/handlers.ts             # ★ MAIN CUSTOMIZATION POINT: your handlers
-│   ├── src/app/abi.ts                  # ★ ABI decoding for non-JSON payloads
-│   ├── src/__tests__/                  # vitest suite
-│   ├── Dockerfile                      # Two-process image (tee-node binary + node)
-│   └── language.env
-│
-├── contracts/InstructionSender.sol     # ★ Your extension's on-chain entry point (shared)
-├── docker/node-base.Dockerfile         # Shared tee-node builder for non-Go images
-├── testdata/conformance/               # Golden wire fixtures, asserted against every language
-├── config/
-│   ├── extension.env                   # Generated by pre-build (gitignored)
-│   └── proxy/extension_proxy.toml      # Proxy config (Redis, DB, ports, addresses)
-├── scripts/                            # ── Language-neutral
-│   ├── full-setup.sh                   # Chains all phases: pre-build → compose → post-build → test
-│   ├── pre-build.sh                    # Compile + deploy + register → writes config
-│   ├── post-build.sh                   # Allow TEE version + register TEE on-chain
-│   ├── test.sh                         # On-chain end-to-end test (identical for all languages)
-│   ├── test-unit.sh                    # Unit tests, dispatched via language.env
-│   ├── test-conformance.sh             # Wire-contract conformance, no chain required
-│   ├── check-versions.sh               # Fails when dependency pins drift apart
-│   ├── build-node-base.sh              # Builds the shared tee-node base image
-│   ├── generate-bindings.sh            # Compile contract → generate Go bindings
-│   └── lib/{language,versions}.sh      # Language resolution + version derivation
-├── tools/                              # ── Language-neutral deployment tooling (Go)
-│   ├── cmd/deploy-contract/            # Deploys InstructionSender to chain
-│   ├── cmd/register-extension/         # Registers extension on TeeExtensionRegistry
-│   ├── cmd/allow-tee-version/          # Registers TEE code hash as allowed version
-│   ├── cmd/register-tee/               # Registers extension TEE machine on-chain
-│   ├── cmd/run-test/                   # Sends instructions and verifies results
-│   └── pkg/utils/instructions.go       # Deploy, SetExtensionId, SendSayHello helpers
-├── docker-compose.yaml                 # Redis + proxy + extension-tee
-├── foundry.toml                        # Foundry config for compiling contracts
-└── .env.example                        # Sample env vars, including LANGUAGE
-
-★ = Files developers MUST modify for their extension
-```
-
-`tools/` is deliberately independent of every language implementation, which is what lets one deployment and test path serve all of them.
-
-## Creating Your Extension
-
-The scaffold ships with a working Hello World. To build your extension you modify four things: the operation constants, the handlers, the Solidity contract, and the test assertions.
-
-| # | File | What you do |
-|---|------|-------------|
-| 1 | `<lang>` config — `go/internal/config/config.go`, `python/app/config.py`, or `typescript/src/app/config.ts` | Define your OPType and OPCommand constants |
-| 2 | `<lang>` handlers — `go/internal/extension/extension.go`, `python/app/handlers.py`, or `typescript/src/app/handlers.ts` | Implement your action handlers and state |
-| 3 | `contracts/InstructionSender.sol` | Add matching `bytes32` constants and send functions |
-| 4 | `tools/cmd/run-test/main.go` | Write test payloads and response assertions |
-
-Go additionally has `go/pkg/types/types.go` for request/response structs; Python and TypeScript declare those shapes inline in the handlers.
-
-The key link between your Solidity contract and your handlers is the **OPType** and **OPCommand** pair, which must match exactly across every layer:
-
-```
-Solidity:    bytes32 constant OP_TYPE_GREETING      = bytes32("GREETING");
-             bytes32 constant OP_COMMAND_SAY_HELLO  = bytes32("SAY_HELLO");
-
-Go:          OPTypeGreeting    = "GREETING"        // internal/config/config.go
-             OPCommandSayHello = "SAY_HELLO"
-
-Python:      OP_TYPE_GREETING     = "GREETING"     # app/config.py
-             OP_COMMAND_SAY_HELLO = "SAY_HELLO"
-
-TypeScript:  OP_TYPE_GREETING     = "GREETING"     // src/app/config.ts
-             OP_COMMAND_SAY_HELLO = "SAY_HELLO"
-```
-
-A mismatch means the action falls through to "unsupported op type" (HTTP 501).
-
-Every handler follows the same 4-step pattern in all three languages: decode the request, validate it, execute your logic, return a result.
-
-> ### **→ [Read the Extension Development Guide](docs/extension-guide.md)** for a detailed walkthrough, and **[docs/extension-contract.md](docs/extension-contract.md)** for the normative wire and container contract.
-
-## Making It Your Own
-
-This repository works out of the box as a Hello World extension. When you're ready to build your own extension, you'll rename the HelloWorld placeholders to your own names and replace the SAY_HELLO logic with your own operations.
-
-> ### **→ [Follow the Making It Your Own guide](docs/manual-setup.md)** for step-by-step renaming instructions.
->
-> Using [Claude Code](https://claude.ai/code)? Run `/rename-scaffold` to do it automatically.
-
-
-## Run It
-
-With local infrastructure up (`docker compose up` from `e2e/`):
+## Verify locally
 
 ```bash
-cp .env.example .env                            # set DEPLOYMENT_PRIVATE_KEY and CHAIN_ID
-LANGUAGE=go ./scripts/full-setup.sh --test      # or python, typescript
+# Go confidential-compute engine
+cd go
+go test ./...
+go test -race ./internal/extension
+go vet ./...
+
+# Solidity + generated Go binding
+cd ..
+forge build
+./scripts/generate-bindings.sh
+
+# Go deployment / encrypted E2E tooling
+cd tools
+go test ./...
+
+# Frontend
+cd ../frontend
+pnpm test
+pnpm build
 ```
 
-Prerequisites, configuration, ports and the failure table are in
-[docs/getting-started.md](docs/getting-started.md). Coston2 deployment and the platform
-traps that cost redeploys are in [docs/deployment-steps.md](docs/deployment-steps.md).
+The full FCC chain → proxy → TEE path additionally requires the infrastructure and environment described in [the upstream setup guide](docs/getting-started.md). Never place production keys in this repository.
 
-## Testing
+## Privacy boundary
 
-Three layers, cheapest first — unit (`test-unit.sh`), wire conformance against golden
-fixtures with no chain required (`test-conformance.sh`), and on-chain end-to-end
-(`test.sh`). Conformance is what guarantees the three implementations stay
-byte-identical on the wire, and it is the acceptance test for any new language. See
-[docs/testing.md](docs/testing.md).
+Private inside FCC:
 
-## Further Reading
+- monthly revenue, existing debt, collateral value, and maximum APR;
+- each lender's APR and available liquidity;
+- quote eligibility, underwriting arithmetic, and winner selection.
 
-**Building your extension**
+Selective disclosure:
 
-- [Extension Development Guide](docs/extension-guide.md) — how the code works and how to add your own logic
-- [Working in Multiple Languages](docs/languages.md) — choosing a language, working in each, and **adding your own**
-- [Making It Your Own](docs/manual-setup.md) — renaming from HelloWorld to your own extension
-- [InstructionSender Contract](docs/instruction-sender.md) — how the on-chain contract works and how to customize it
+- request commitment and coarse risk tier;
+- selected lender, amount, term, and winning APR;
+- aggregate eligible quote count and FCC-signed result envelope.
 
-**Reference**
+The prototype stores auction state in one TEE process. The contract pins an auction's follow-up operations to its selected machine, but encrypted authenticated state recovery remains production work. See [the threat model](docs/THREAT_MODEL.md) for the exact assumptions and exclusions.
 
-- [Extension Container Contract](docs/extension-contract.md) — the normative wire format and container spec every implementation must satisfy
-- [Testing Guide](docs/testing.md) — the test layers, conformance fixtures, and what to run when
-- [Reproducibility](REPRODUCIBILITY.md) — what each language's build actually guarantees
+## Current limitations
 
-**Per-language**
+- No real FXRP is moved by the hosted browser demo.
+- The Solidity funding and collateral-release functions are a scaffold, not a complete lending protocol: repayment, maturity, liquidation, KYC, and collections are out of scope.
+- The native FCC `ActionResult` path is exercised by the E2E runner; the separate EIP-191 relay surface still needs its custom `/sign` integration and signer setup before onchain use.
+- The risk policy is illustrative and is not financial advice or a production underwriting model.
+- Persistent encrypted state, recovery, and multi-machine failover remain roadmap items.
 
-- [go/README.md](go/README.md) · [python/README.md](python/README.md) · [typescript/README.md](typescript/README.md)
+## Built from Flare's official scaffold
 
----
+VeilCredit was built from Flare's `fce-extension-scaffold`. The upstream project supplied the FCC transport, registration/deployment scripts, and Hello World examples. VeilCredit adds the Go credit engine, encrypted auction schemas, matching/privacy logic, Solidity funding surface, tests, threat model, submission material, and interactive frontend.
 
-## Built On
+- [Flare Confidential Compute overview](https://dev.flare.network/fcc/overview)
+- [FAssets overview](https://dev.flare.network/fassets/overview)
+- [Flare Summer Signal](https://dorahacks.io/hackathon/flaresummersignal)
 
-Flare Confidential Compute — see the [FCC overview](https://dev.flare.network/fcc/overview) for the underlying primitives (extensions, signing policies, data providers, attestation, Protocol Managed Wallets).
+MIT licensed; see [LICENSE](LICENSE).

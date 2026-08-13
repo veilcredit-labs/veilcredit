@@ -8,13 +8,19 @@ import (
 )
 
 const (
-	Version = "0.1.0"
+	Version = "1.0.0"
 
-	OPTypeGreeting     = "GREETING"
-	OPCommandSayHello  = "SAY_HELLO"
-	OPCommandSayGoodbye = "SAY_GOODBYE"
+	OPTypeCredit       = "CREDIT"
+	OPCommandOpen      = "OPEN"
+	OPCommandQuote     = "QUOTE"
+	OPCommandFinalize  = "FINALIZE"
+	TimeoutShutdown    = 5 * time.Second
+	TimeoutNodeRequest = 10 * time.Second
 
-	TimeoutShutdown = 5 * time.Second
+	// MaxEncryptedMessageBytes bounds both encrypted input and decrypted JSON.
+	// Loan requests are tiny; the generous limit primarily protects the TEE from
+	// accidental or adversarial unbounded allocations.
+	MaxEncryptedMessageBytes = 64 * 1024
 )
 
 // Defaults.

@@ -1,8 +1,11 @@
 package main
 
 import (
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"flag"
+	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -12,167 +15,353 @@ import (
 	instrutils "extension-scaffold/tools/pkg/utils"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
 	"github.com/flare-foundation/go-flare-common/pkg/logger"
+	teetypes "github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/pkg/errors"
 )
 
-// Expected response shapes for the scaffold's Hello World operations.
-//
-// These are deliberately declared here rather than imported from the extension:
-// this tool asserts on the *wire format*, and must run unchanged against every
-// language implementation (see docs/extension-contract.md). Keeping them local
-// is what lets tools/ stay independent of any one implementation.
-
-type sayHelloResponse struct {
-	Greeting       string `json:"greeting"`
-	GreetingNumber int    `json:"greetingNumber"`
+// These structs are the VeilCredit wire contract. They intentionally live in
+// tools instead of importing the Go extension, so the same E2E test can verify
+// every language implementation.
+type openRequest struct {
+	RequestID         string `json:"requestId"`
+	Borrower          string `json:"borrower"`
+	AmountFxrp        uint64 `json:"amountFxrp"`
+	CollateralUSD     uint64 `json:"collateralUsd"`
+	MonthlyRevenueUSD uint64 `json:"monthlyRevenueUsd"`
+	ExistingDebtUSD   uint64 `json:"existingDebtUsd"`
+	TermDays          uint64 `json:"termDays"`
+	MaxAprBps         uint64 `json:"maxAprBps"`
 }
 
-type sayGoodbyeResponse struct {
-	Farewell       string `json:"farewell"`
-	FarewellNumber int    `json:"farewellNumber"`
+type quoteRequest struct {
+	Lender        string `json:"lender"`
+	RequestID     string `json:"requestId"`
+	AprBps        uint64 `json:"aprBps"`
+	LiquidityFxrp uint64 `json:"liquidityFxrp"`
+}
+
+type openResponse struct {
+	RequestID   string `json:"requestId"`
+	RiskScore   uint64 `json:"riskScore"`
+	RiskTier    string `json:"riskTier"`
+	MaxLoanFxrp uint64 `json:"maxLoanFxrp"`
+	Commitment  string `json:"commitment"`
+}
+
+type quoteResponse struct {
+	RequestID string `json:"requestId"`
+	Received  bool   `json:"received"`
+}
+
+type finalizeResponse struct {
+	RequestID     string `json:"requestId"`
+	Borrower      string `json:"borrower"`
+	WinningLender string `json:"winningLender"`
+	AprBps        uint64 `json:"aprBps"`
+	AmountFxrp    uint64 `json:"amountFxrp"`
+	RiskTier      string `json:"riskTier"`
+	Commitment    string `json:"commitment"`
+	QuoteCount    uint64 `json:"quoteCount"`
 }
 
 func main() {
 	af := flag.String("a", configs.AddressesFile, "file with deployed addresses")
-	cf := flag.String("c", configs.ChainNodeURL, "chain node url")
-	pf := flag.String("p", configs.ExtensionProxyURL, "extension proxy url")
-	instructionSenderF := flag.String("instructionSender", "", "instructionSender address")
+	cf := flag.String("c", configs.ChainNodeURL, "chain node URL")
+	pf := flag.String("p", configs.ExtensionProxyURL, "extension proxy URL")
+	instructionSenderF := flag.String("instructionSender", "", "InstructionSender address")
+	assetF := flag.String("asset", os.Getenv("VEILCREDIT_ASSET"), "FXRP/token address used as public request metadata")
+	principalF := flag.Uint64("principal", 1_000_000, "synthetic requested FXRP amount in smallest units")
+	timeoutF := flag.Duration("timeout", 90*time.Second, "maximum wait for each FCC result")
 	flag.Parse()
 
+	if !common.IsHexAddress(*instructionSenderF) {
+		fccutils.FatalWithCause(errors.Errorf("invalid -instructionSender address %q", *instructionSenderF))
+	}
 	instructionSenderAddress := common.HexToAddress(*instructionSenderF)
 
 	testSupport, err := support.DefaultSupport(*af, *cf)
 	if err != nil {
 		fccutils.FatalWithCause(err)
 	}
+	borrower := crypto.PubkeyToAddress(testSupport.Prv.PublicKey)
 
-	// --- Generic: configure contract -----------------------------------------
-	logger.Infof("Setting extension ID on instruction sender...")
-	err = instrutils.SetExtensionId(testSupport, instructionSenderAddress)
-	if err != nil {
+	// The no-collateral E2E path never calls the token. Falling back to the
+	// deployer keeps the scaffold's scripts zero-configuration while making the
+	// synthetic metadata non-zero. Set VEILCREDIT_ASSET for a real FXRP address.
+	asset := borrower
+	if *assetF != "" {
+		if !common.IsHexAddress(*assetF) {
+			fccutils.FatalWithCause(errors.Errorf("invalid -asset address %q", *assetF))
+		}
+		asset = common.HexToAddress(*assetF)
+	} else {
+		logger.Infof("VEILCREDIT_ASSET is unset; using deployer as synthetic no-collateral asset metadata")
+	}
+
+	logger.Infof("Setting extension ID on VeilCredit InstructionSender...")
+	if err := instrutils.SetExtensionId(testSupport, instructionSenderAddress); err != nil {
 		if strings.Contains(err.Error(), "already set") || strings.Contains(err.Error(), "Extension ID already set") {
-			logger.Infof("Extension ID already set on contract, continuing")
+			logger.Infof("Extension ID already set, continuing")
 		} else {
-			logger.Errorf("setExtensionId failed: %s", err)
 			fccutils.FatalWithCause(errors.Errorf(
-				"setExtensionId failed — is the extension registered? Check that pre-build.sh completed successfully. Error: %s", err))
+				"setExtensionId failed — is the extension registered? %s", err,
+			))
 		}
 	}
+	// Keep the executable E2E reasonably fast while leaving enough time for OPEN
+	// to complete before QUOTE is submitted. The duration is snapshotted into
+	// each new request and does not affect any request that was already open.
+	const e2eAuctionDuration = 30 * time.Second
+	logger.Infof("Setting %s auction duration for this synthetic E2E request...", e2eAuctionDuration)
+	if err := instrutils.SetAuctionDuration(testSupport, instructionSenderAddress, uint64(e2eAuctionDuration/time.Second)); err != nil {
+		fccutils.FatalWithCause(err)
+	}
 
-	// --- Test case 1: Send a SAY_HELLO instruction ---
-	logger.Infof("Sending SAY_HELLO instruction...")
-
-	payload, err := json.Marshal(map[string]interface{}{
-		"name": "World",
-	})
+	logger.Infof("Fetching the attested TEE encryption key...")
+	encryptor, err := teeEncryptor(*pf)
 	if err != nil {
 		fccutils.FatalWithCause(err)
 	}
 
-	instructionId, _, err := instrutils.SendSayHello(testSupport, instructionSenderAddress, payload)
+	principal := new(big.Int).SetUint64(*principalF)
+	requestID, err := instrutils.PreviewRequestID(
+		testSupport, instructionSenderAddress, borrower, asset, principal, big.NewInt(0),
+	)
 	if err != nil {
 		fccutils.FatalWithCause(err)
 	}
-	logger.Infof("Instruction sent. ID: %s", instructionId.Hex())
+	logger.Infof("Next request ID: %s", requestID.Hex())
 
-	time.Sleep(5 * time.Second)
+	// Strong synthetic borrower data makes the happy-path result deterministic.
+	openPayload := openRequest{
+		RequestID:         requestID.Hex(),
+		Borrower:          strings.ToLower(borrower.Hex()),
+		AmountFxrp:        *principalF,
+		CollateralUSD:     2_500,
+		MonthlyRevenueUSD: 5_000,
+		ExistingDebtUSD:   250,
+		TermDays:          30,
+		MaxAprBps:         1_800,
+	}
+	encryptedOpen, err := encryptJSON(encryptor, openPayload)
+	if err != nil {
+		fccutils.FatalWithCause(errors.Errorf("encrypt OPEN payload: %s", err))
+	}
 
-	err = verifyHelloResult(*pf, instructionId)
+	logger.Infof("Sending CREDIT/OPEN (%d encrypted bytes)...", len(encryptedOpen))
+	openInstructionID, openTx, err := instrutils.SendOpen(
+		testSupport, instructionSenderAddress, encryptedOpen, asset, principal,
+	)
 	if err != nil {
 		fccutils.FatalWithCause(err)
 	}
-	logger.Infof("Test passed: SAY_HELLO instruction processed successfully")
+	logger.Infof("OPEN instruction=%s tx=%s", openInstructionID.Hex(), openTx.Hex())
 
-	// --- Test case 2: Send a SAY_GOODBYE instruction ---
-	logger.Infof("Sending SAY_GOODBYE instruction...")
+	var opened openResponse
+	if err := waitAndDecode(*pf, openInstructionID, *timeoutF, &opened); err != nil {
+		fccutils.FatalWithCause(errors.Errorf("OPEN result: %s", err))
+	}
+	if err := verifyOpen(requestID, *principalF, opened); err != nil {
+		fccutils.FatalWithCause(err)
+	}
+	logger.Infof("OPEN verified: tier=%s score=%d maxLoanFxrp=%d", opened.RiskTier, opened.RiskScore, opened.MaxLoanFxrp)
 
-	goodbyeInstructionId, _, err := instrutils.SendSayGoodbye(testSupport, instructionSenderAddress, "World", "heading out")
+	quotePayload := quoteRequest{
+		Lender:        strings.ToLower(borrower.Hex()),
+		RequestID:     requestID.Hex(),
+		AprBps:        900,
+		LiquidityFxrp: *principalF,
+	}
+	encryptedQuote, err := encryptJSON(encryptor, quotePayload)
+	if err != nil {
+		fccutils.FatalWithCause(errors.Errorf("encrypt QUOTE payload: %s", err))
+	}
+
+	logger.Infof("Sending CREDIT/QUOTE (%d encrypted bytes)...", len(encryptedQuote))
+	quoteInstructionID, quoteTx, err := instrutils.SendQuote(
+		testSupport, instructionSenderAddress, requestID, encryptedQuote,
+	)
 	if err != nil {
 		fccutils.FatalWithCause(err)
 	}
-	logger.Infof("Instruction sent. ID: %s", goodbyeInstructionId.Hex())
+	logger.Infof("QUOTE instruction=%s tx=%s", quoteInstructionID.Hex(), quoteTx.Hex())
 
-	time.Sleep(5 * time.Second)
+	var quoted quoteResponse
+	if err := waitAndDecode(*pf, quoteInstructionID, *timeoutF, &quoted); err != nil {
+		fccutils.FatalWithCause(errors.Errorf("QUOTE result: %s", err))
+	}
+	if err := verifyQuote(requestID, quoted); err != nil {
+		fccutils.FatalWithCause(err)
+	}
+	logger.Infof("QUOTE verified: received=%t (eligibility remains private)", quoted.Received)
 
-	err = verifyGoodbyeResult(*pf, goodbyeInstructionId)
+	// Waiting a full configured duration from QUOTE guarantees that the request's
+	// earlier OPEN timestamp has passed even on automined development chains.
+	time.Sleep(e2eAuctionDuration + time.Second)
+	logger.Infof("Sending CREDIT/FINALIZE...")
+	finalizeInstructionID, finalizeTx, err := instrutils.SendFinalize(
+		testSupport, instructionSenderAddress, requestID,
+	)
 	if err != nil {
 		fccutils.FatalWithCause(err)
 	}
-	logger.Infof("Test passed: SAY_GOODBYE instruction processed successfully")
+	logger.Infof("FINALIZE instruction=%s tx=%s", finalizeInstructionID.Hex(), finalizeTx.Hex())
 
-	logger.Infof("All tests passed.")
+	var finalized finalizeResponse
+	if err := waitAndDecode(*pf, finalizeInstructionID, *timeoutF, &finalized); err != nil {
+		fccutils.FatalWithCause(errors.Errorf("FINALIZE result: %s", err))
+	}
+	if err := verifyFinalization(requestID, borrower, *principalF, opened, finalized); err != nil {
+		fccutils.FatalWithCause(err)
+	}
+	logger.Infof(
+		"FINALIZE verified: lender=%s aprBps=%d amountFxrp=%d commitment=%s",
+		finalized.WinningLender, finalized.AprBps, finalized.AmountFxrp, finalized.Commitment,
+	)
+	logger.Infof("All VeilCredit OPEN -> QUOTE -> FINALIZE tests passed.")
 }
 
-func verifyHelloResult(proxyURL string, instructionId common.Hash) error {
-	// --- Generic: poll proxy for result (do not modify) ---
-	actionResponse, err := fccutils.ActionResult(proxyURL, instructionId)
+func teeEncryptor(proxyURL string) (*ecies.PublicKey, error) {
+	teeInfo, err := fccutils.TeeInfo(proxyURL)
 	if err != nil {
-		return err
+		return nil, errors.Errorf("fetch TEE info: %s", err)
 	}
-	actionResult := actionResponse.Result
-
-	if actionResult.Status == 0 {
-		return errors.Errorf("instruction processing failed: %s", actionResult.Log)
-	}
-	if actionResult.Status == 2 {
-		return errors.New("instruction still pending after polling, expected completed")
-	}
-
-	if len(actionResult.Data) == 0 {
-		return errors.New("expected response data but got none")
-	}
-
-	var resp sayHelloResponse
-	err = json.Unmarshal(actionResult.Data, &resp)
+	ecdsaPub, err := teetypes.ParsePubKey(teeInfo.MachineData.PublicKey)
 	if err != nil {
-		return errors.Errorf("failed to unmarshal response: %s", err)
+		return nil, errors.Errorf("parse TEE public key: %s", err)
 	}
+	return &ecies.PublicKey{
+		X:      ecdsaPub.X,
+		Y:      ecdsaPub.Y,
+		Curve:  ecies.DefaultCurve,
+		Params: ecies.ECIES_AES128_SHA256,
+	}, nil
+}
 
-	if resp.Greeting == "" {
-		return errors.New("expected non-empty Greeting")
+func encryptJSON(publicKey *ecies.PublicKey, value interface{}) ([]byte, error) {
+	plaintext, err := json.Marshal(value)
+	if err != nil {
+		return nil, errors.Errorf("marshal payload: %s", err)
 	}
-	if resp.GreetingNumber < 1 {
-		return errors.Errorf("expected GreetingNumber >= 1, got %d", resp.GreetingNumber)
+	ciphertext, err := ecies.Encrypt(cryptorand.Reader, publicKey, plaintext, nil, nil)
+	if err != nil {
+		return nil, errors.Errorf("ECIES encrypt: %s", err)
 	}
+	return ciphertext, nil
+}
 
-	logger.Infof("Response data: %+v", resp)
+func waitAndDecode(proxyURL string, instructionID common.Hash, timeout time.Duration, dst interface{}) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		actionResponse, err := fccutils.ActionResult(proxyURL, instructionID)
+		if err != nil {
+			if time.Now().After(deadline) {
+				return errors.Errorf("poll result after %s: %s", timeout, err)
+			}
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		result := actionResponse.Result
+		switch result.Status {
+		case 0:
+			return errors.Errorf("instruction processing failed: %s", result.Log)
+		case 1:
+			if len(result.Data) == 0 {
+				return errors.New("expected response data but got none")
+			}
+			if err := json.Unmarshal(result.Data, dst); err != nil {
+				return errors.Errorf("decode response: %s", err)
+			}
+			return nil
+		case 2:
+			if time.Now().After(deadline) {
+				return errors.Errorf("instruction still pending after %s", timeout)
+			}
+			time.Sleep(2 * time.Second)
+		default:
+			return errors.Errorf("unexpected ActionResult status %d", result.Status)
+		}
+	}
+}
 
+func verifyOpen(requestID common.Hash, principal uint64, response openResponse) error {
+	if !strings.EqualFold(response.RequestID, requestID.Hex()) {
+		return errors.Errorf("OPEN requestId mismatch: want %s, got %s", requestID.Hex(), response.RequestID)
+	}
+	if response.RiskTier == "" {
+		return errors.New("OPEN response has empty riskTier")
+	}
+	if response.RiskTier != "A" {
+		return errors.Errorf("OPEN expected deterministic riskTier A, got %s", response.RiskTier)
+	}
+	if response.RiskScore < 300 || response.RiskScore > 850 {
+		return errors.Errorf("OPEN riskScore must be between 300 and 850, got %d", response.RiskScore)
+	}
+	if response.MaxLoanFxrp != principal {
+		return errors.Errorf("OPEN expected maxLoanFxrp %d, got %d", principal, response.MaxLoanFxrp)
+	}
+	if !nonZeroHash(response.Commitment) {
+		return errors.Errorf("OPEN commitment is not a non-zero bytes32: %q", response.Commitment)
+	}
 	return nil
 }
 
-func verifyGoodbyeResult(proxyURL string, instructionId common.Hash) error {
-	actionResponse, err := fccutils.ActionResult(proxyURL, instructionId)
-	if err != nil {
-		return err
+func verifyQuote(requestID common.Hash, response quoteResponse) error {
+	if !strings.EqualFold(response.RequestID, requestID.Hex()) {
+		return errors.Errorf("QUOTE requestId mismatch: want %s, got %s", requestID.Hex(), response.RequestID)
 	}
-	actionResult := actionResponse.Result
-
-	if actionResult.Status == 0 {
-		return errors.Errorf("instruction processing failed: %s", actionResult.Log)
+	if !response.Received {
+		return errors.New("QUOTE was not acknowledged")
 	}
-	if actionResult.Status == 2 {
-		return errors.New("instruction still pending after polling, expected completed")
-	}
-
-	if len(actionResult.Data) == 0 {
-		return errors.New("expected response data but got none")
-	}
-
-	var resp sayGoodbyeResponse
-	err = json.Unmarshal(actionResult.Data, &resp)
-	if err != nil {
-		return errors.Errorf("failed to unmarshal response: %s", err)
-	}
-
-	if resp.Farewell == "" {
-		return errors.New("expected non-empty Farewell")
-	}
-	if resp.FarewellNumber < 1 {
-		return errors.Errorf("expected FarewellNumber >= 1, got %d", resp.FarewellNumber)
-	}
-
-	logger.Infof("Response data: %+v", resp)
-
 	return nil
+}
+
+func verifyFinalization(
+	requestID common.Hash,
+	borrower common.Address,
+	principal uint64,
+	opened openResponse,
+	response finalizeResponse,
+) error {
+	if !strings.EqualFold(response.RequestID, requestID.Hex()) {
+		return errors.Errorf("FINALIZE requestId mismatch: want %s, got %s", requestID.Hex(), response.RequestID)
+	}
+	if !strings.EqualFold(response.Borrower, borrower.Hex()) {
+		return errors.Errorf("FINALIZE borrower mismatch: want %s, got %s", borrower.Hex(), response.Borrower)
+	}
+	if !common.IsHexAddress(response.WinningLender) || common.HexToAddress(response.WinningLender) == (common.Address{}) {
+		return errors.Errorf("FINALIZE has invalid winningLender %q", response.WinningLender)
+	}
+	if !strings.EqualFold(response.WinningLender, borrower.Hex()) {
+		return errors.Errorf("FINALIZE winner mismatch: want %s, got %s", borrower.Hex(), response.WinningLender)
+	}
+	if response.AprBps != 900 {
+		return errors.Errorf("FINALIZE expected winning aprBps 900, got %d", response.AprBps)
+	}
+	if response.AmountFxrp != principal {
+		return errors.Errorf("FINALIZE expected amountFxrp %d, got %d", principal, response.AmountFxrp)
+	}
+	if response.RiskTier != opened.RiskTier {
+		return errors.Errorf("FINALIZE riskTier changed: OPEN=%s FINALIZE=%s", opened.RiskTier, response.RiskTier)
+	}
+	if !nonZeroHash(response.Commitment) {
+		return errors.Errorf("FINALIZE commitment is not a non-zero bytes32: %q", response.Commitment)
+	}
+	if !strings.EqualFold(response.Commitment, opened.Commitment) {
+		return errors.Errorf("FINALIZE commitment changed from OPEN")
+	}
+	if response.QuoteCount != 1 {
+		return errors.Errorf("FINALIZE expected one eligible quote, got %d", response.QuoteCount)
+	}
+	return nil
+}
+
+func nonZeroHash(value string) bool {
+	if len(value) != 66 || !strings.HasPrefix(value, "0x") {
+		return false
+	}
+	return common.HexToHash(value) != (common.Hash{})
 }

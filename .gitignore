@@ -46,6 +46,9 @@ tools/pkg/contracts/*/*.bin
 # anchor for `npm ci` in typescript/Dockerfile.
 typescript/node_modules/
 typescript/dist/
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
 python/__pycache__/
 python/**/__pycache__/
 python/.venv/

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # generate-bindings.sh — Compile Solidity contracts and generate Go bindings.
 #
-# Prerequisites: forge (Foundry), jq
+# Prerequisites: forge (Foundry), jq, Go
 #
 # Usage: ./scripts/generate-bindings.sh
 set -euo pipefail
@@ -10,11 +10,26 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # --- Contract name and Go package ---
-CONTRACT_NAME="HelloWorldInstructionSender"
-GO_PKG="helloworld"
+CONTRACT_NAME="VeilCreditInstructionSender"
+GO_PKG="veilcredit"
 BINDINGS_DIR="$PROJECT_DIR/tools/pkg/contracts/$GO_PKG"
 
 cd "$PROJECT_DIR"
+
+missing_tools=()
+for tool in forge jq go; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        missing_tools+=("$tool")
+        echo "ERROR: required tool '$tool' is not installed or not on PATH." >&2
+        case "$tool" in
+            forge) echo "Install Foundry from https://getfoundry.sh, then re-run this script." >&2 ;;
+            go)    echo "Install the Go version declared in tools/go.mod, then re-run this script." >&2 ;;
+        esac
+    fi
+done
+if (( ${#missing_tools[@]} > 0 )); then
+    exit 1
+fi
 
 echo "=== Step 1: Compile Solidity contracts ==="
 forge build
