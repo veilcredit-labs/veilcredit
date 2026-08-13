@@ -2,7 +2,7 @@
 
 ## One-line description
 
-VeilCredit is a sealed underwriting and lender-quote marketplace where borrower financials and lender pricing stay private inside Flare Confidential Compute, while the winning FXRP loan terms become verifiable onchain.
+VeilCredit is a prototype sealed-credit auction for FXRP. Its FCC extension evaluates private borrower inputs and lender quotes, then selectively discloses the winning lender, APR, and approved amount.
 
 ## Track
 
@@ -32,10 +32,14 @@ VeilCredit runs a deterministic credit auction in an attested TEE:
 
 Losing quotes and borrower source data never appear in the response or observable extension state.
 
+## Target user
+
+Primary users are Flare/XRP ecosystem businesses seeking short-term FXRP credit without exposing operating data. Secondary users are FXRP liquidity providers that want to submit pricing and liquidity without revealing their losing strategy.
+
 ## Why Flare
 
-- **Flare Confidential Compute (FCC):** decrypts underwriting packets and quotes, executes matching, and signs the result inside a TEE whose code hash is registered onchain.
-- **FXRP / FAssets:** makes XRP usable as the loan asset on an EVM chain without relying on a custodial wrapped token.
+- **Flare Confidential Compute (FCC):** the extension is designed to decrypt underwriting packets and quotes, execute matching, and return the result inside a registered TEE when deployed through FCC.
+- **FXRP / FAssets:** FXRP is the target loan asset for the prototype; live FAssets funding is roadmap work, not claimed as integrated.
 - **Flare onchain boundary:** keeps the instruction lifecycle and experimental funding/collateral surface inspectable while decision inputs remain private.
 - **Future FTSO integration:** the production path values FXRP collateral with Flare's decentralized XRP/USD feed rather than a lender-supplied price.
 
@@ -48,12 +52,9 @@ Losing quotes and borrower source data never appear in the response or observabl
 
 ## What becomes public
 
-- Request identifier and commitment
-- Selected lender
-- Principal, term, and winning APR
-- Coarse risk tier
-- Number of eligible quotes
-- FCC-signed result envelope / funding status
+- `OPEN`: request identifier, exact prototype risk score, risk tier, maximum approved amount, and commitment
+- `FINALIZE`: borrower, selected lender, approved amount, winning APR, risk tier, commitment, and eligible quote count
+- Public contract metadata, including principal and collateral escrow amount, remains visible outside FCC
 
 ## Technical highlights
 
@@ -87,7 +88,13 @@ VeilCredit makes its assumptions explicit:
 
 ## What was built during the hackathon
 
-The official scaffold supplied the FCC transport, registration scripts, and a Hello World example. VeilCredit adds the complete product layer: encrypted credit request and quote schemas, risk engine, sealed matching logic, privacy-preserving state, lifecycle validation, funding contract surface, tests, interactive frontend, threat model, and submission assets.
+The official scaffold supplied the FCC transport, registration scripts, and a Hello World example. VeilCredit adds a hackathon reference implementation: encrypted credit request and quote schemas, risk engine, sealed matching logic, privacy-preserving state, lifecycle validation, an experimental funding contract surface, tests, interactive frontend, threat model, and submission assets.
+
+The comparison from the scaffold base to the submitted project is public at <https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...9bb36fb>.
+
+## Deployment status and evidence
+
+The hosted Netlify experience is an explicitly simulated, browser-only walkthrough. VeilCredit is not deployed on Coston2, Songbird, or Flare Mainnet, and no public contract address or real-asset movement is claimed. See [`JUDGE_EVIDENCE.md`](JUDGE_EVIDENCE.md) for reproducible commands, test coverage, the exact disclosure boundary, and current limitations.
 
 ## Roadmap
 

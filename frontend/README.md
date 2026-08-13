@@ -30,7 +30,7 @@ pnpm test
 ## Demo path
 
 1. Adjust any borrower inputs.
-2. Select **Encrypt & request quotes**.
+2. Select **Simulate private request**.
 3. Wait while three sealed quotes arrive.
 4. Select **Reveal winner** to show the best eligible offer.
 

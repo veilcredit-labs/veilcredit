@@ -121,7 +121,7 @@ function App() {
   const [status, setStatus] = useState<RequestStatus>('ready')
   const [activeNav, setActiveNav] = useState('Borrow')
   const [mobileMenu, setMobileMenu] = useState(false)
-  const [visibleQuotes, setVisibleQuotes] = useState(3)
+  const [visibleQuotes, setVisibleQuotes] = useState(0)
 
   const activeStep = useMemo(() => {
     if (status === 'ready' || status === 'encrypting') return 0
@@ -181,7 +181,7 @@ function App() {
 
   const resetDemo = () => {
     setStatus('ready')
-    setVisibleQuotes(3)
+    setVisibleQuotes(0)
   }
 
   return (
@@ -281,7 +281,7 @@ function App() {
               <div className="eyebrow"><span /> Confidential by default</div>
               <h1>Credit terms in the open.<br /><em>Your business data isn’t.</em></h1>
               <p>
-                Borrow FXRP against verified cash flow. Lenders compete on price while your financials stay encrypted end-to-end.
+                Explore FXRP credit against borrower-declared cash flow. The implemented FCC engine keeps financial inputs and losing quotes out of its disclosed result.
               </p>
             </div>
             <div className="hero__stat">
@@ -322,7 +322,7 @@ function App() {
                   <span className="panel__label"><Landmark size={14} /> Borrower brief</span>
                   <h2>Build your request</h2>
                 </div>
-                <span className="private-chip"><EyeOff size={13} /> Private inputs</span>
+                <span className="private-chip"><EyeOff size={13} /> Sealed in FCC flow</span>
               </div>
 
               <div className="form-grid">
@@ -424,7 +424,7 @@ function App() {
                 disabled={status === 'encrypting' || status === 'collecting' || status === 'revealable'}
               >
                 {status === 'encrypting' ? (
-                  <><span className="spinner" /> Encrypting financial brief…</>
+                  <><span className="spinner" /> Simulating encrypted brief…</>
                 ) : status === 'collecting' ? (
                   <><span className="spinner" /> Collecting sealed quotes…</>
                 ) : status === 'revealable' ? (
@@ -432,10 +432,10 @@ function App() {
                 ) : status === 'revealed' ? (
                   <><Sparkles size={17} /> Run another request</>
                 ) : (
-                  <><LockKeyhole size={17} /> Encrypt &amp; request quotes <ArrowRight size={17} /></>
+                  <><LockKeyhole size={17} /> Simulate private request <ArrowRight size={17} /></>
                 )}
               </button>
-              <p className="submit-note"><KeyRound size={12} /> Only the policy-bound TEE can decrypt these fields</p>
+              <p className="submit-note"><KeyRound size={12} /> Browser simulation mirrors the implemented policy-bound TEE flow</p>
             </article>
 
             <article className="panel quotes-panel">
@@ -446,7 +446,7 @@ function App() {
                 </div>
                 <div className="auction-timer">
                   <Clock3 size={13} />
-                  <span>{status === 'collecting' || status === 'encrypting' ? 'Simulated bidding' : 'Demo window closed'}</span>
+                  <span>{status === 'ready' ? 'Ready to simulate' : status === 'collecting' || status === 'encrypting' ? 'Simulated bidding' : 'Demo window closed'}</span>
                 </div>
               </div>
 
@@ -460,8 +460,8 @@ function App() {
                   <strong>{status === 'revealed' && winningQuote ? winningQuote.rate : '••••'}<small> APR</small></strong>
                 </div>
                 <div>
-                  <span>Privacy</span>
-                  <strong className="privacy-score"><ShieldCheck size={16} /> 100%</strong>
+                  <span>Disclosure</span>
+                  <strong className="privacy-score"><ShieldCheck size={16} /> Winner only</strong>
                 </div>
               </div>
 
@@ -469,8 +469,8 @@ function App() {
                 {visibleQuotes === 0 && (
                   <div className="quotes-empty">
                     <div className="radar"><span /><span /><i><LockKeyhole size={17} /></i></div>
-                    <strong>Opening private auction</strong>
-                    <span>Lenders will see an eligible risk band—not your raw data.</span>
+                    <strong>{status === 'ready' ? 'Ready for private auction' : 'Opening private auction'}</strong>
+                    <span>In the FCC path, lenders receive a risk tier—not raw borrower data.</span>
                   </div>
                 )}
 
@@ -485,8 +485,8 @@ function App() {
                       <div className="quote-card__top">
                         <span className="lender-avatar">{quote.avatar}</span>
                         <span className="quote-card__lender">
-                          <strong>{isWinner ? quote.lender : `Verified lender ${index + 1}`}</strong>
-                          <small><BadgeCheck size={11} /> {isWinner ? `${quote.reputation} reputation · selected` : 'Qualified · terms remain encrypted'}</small>
+                          <strong>{isWinner ? quote.lender : `Simulated lender ${index + 1}`}</strong>
+                          <small><BadgeCheck size={11} /> {isWinner ? `Demo reputation ${quote.reputation} · selected` : 'Quote received · eligibility stays private'}</small>
                         </span>
                         {isWinner ? <span className="winner-chip"><Sparkles size={11} /> Best offer</span> : <span className="sealed-chip"><LockKeyhole size={11} /> SEALED</span>}
                       </div>
@@ -505,7 +505,7 @@ function App() {
                   <span className="reveal-box__icon"><Eye size={16} /></span>
                   <span>
                     <strong>{status === 'revealed' ? 'Winning quote revealed' : 'Blind until the window closes'}</strong>
-                  <small>{status === 'revealed' ? 'Only the selected offer is disclosed; losing terms stay sealed.' : 'No lender can see competing terms.'}</small>
+                  <small>{status === 'revealed' ? 'Only the selected sample offer is disclosed; losing terms stay sealed.' : 'Competing sample terms remain hidden.'}</small>
                   </span>
                 </div>
                 <button
@@ -523,7 +523,7 @@ function App() {
             <section className="winner-banner" role="status">
               <div className="winner-banner__orb"><Sparkles size={22} /></div>
               <div>
-                <span className="winner-banner__eyebrow">Best eligible offer</span>
+                <span className="winner-banner__eyebrow">Simulated FCC result · Best eligible offer</span>
                 <h3>{winningQuote ? <>{winningQuote.lender} wins at <em>{winningQuote.rate} APR</em></> : 'No quote cleared the private APR ceiling'}</h3>
                 <p>{winningQuote ? `Estimated interest: ${estimatedInterest} FXRP · ${form.term} · ${winningQuote.origination} origination` : 'Raise the maximum APR or run another request to clear an eligible offer.'}</p>
               </div>
@@ -535,7 +535,7 @@ function App() {
             <div className="section-heading">
               <div>
                 <div className="eyebrow"><span /> Privacy architecture</div>
-                <h2>Verified enough to price.<br /><em>Private enough to trust.</em></h2>
+                <h2>Enough context to price.<br /><em>Selective disclosure by design.</em></h2>
               </div>
               <p>VeilCredit turns sensitive borrower inputs into an auditable eligibility result without putting the underlying financials onchain.</p>
             </div>
@@ -545,15 +545,15 @@ function App() {
                 <span className="flow-card__number">01</span>
                 <span className="flow-card__icon"><KeyRound size={20} /></span>
                 <h3>Encrypt locally</h3>
-                <p>Financials are sealed in your browser with the enclave’s attested public key.</p>
-                <span className="flow-card__meta">ECIES · ephemeral key</span>
+                <p>The production path seals financials to the selected enclave public key; this hosted walkthrough animates that step.</p>
+                <span className="flow-card__meta">Implemented ECIES path · simulated UI</span>
               </div>
               <div className="flow-connector"><span /><ArrowRight size={15} /></div>
               <div className="flow-card flow-card--featured">
                 <span className="flow-card__number">02</span>
                 <span className="flow-card__icon"><Fingerprint size={20} /></span>
                 <h3>Compute in TEE</h3>
-                <p>A policy-bound enclave verifies coverage and cash flow in isolation.</p>
+                <p>The Go extension evaluates borrower-declared coverage and cash flow in isolation.</p>
                 <span className="flow-card__meta"><span className="status-dot" /> Attestation-ready path</span>
               </div>
               <div className="flow-connector"><span /><ArrowRight size={15} /></div>
@@ -561,15 +561,15 @@ function App() {
                 <span className="flow-card__number">03</span>
                 <span className="flow-card__icon"><Network size={20} /></span>
                 <h3>Authorize on Flare</h3>
-                <p>The prototype exposes winning terms for a domain-separated onchain funding relay.</p>
-                <span className="flow-card__meta">FXRP funding scaffold</span>
+                <p>The contract contains an experimental funding relay that is not connected to this demo.</p>
+                <span className="flow-card__meta">Prototype contract surface</span>
               </div>
             </div>
 
             <div className="disclosure-strip">
-              <div><EyeOff size={17} /><span><strong>Never disclosed</strong> Revenue · Debt · Collateral composition</span></div>
+              <div><EyeOff size={17} /><span><strong>Protected in FCC path</strong> Revenue · Debt · APR ceiling · Quote terms</span></div>
               <div className="disclosure-divider" />
-              <div><Eye size={17} /><span><strong>Publicly verifiable</strong> Eligibility · Winner · Settlement</span></div>
+              <div><Eye size={17} /><span><strong>Selective result</strong> Risk decision · Winner · Clearing terms</span></div>
             </div>
           </section>
 

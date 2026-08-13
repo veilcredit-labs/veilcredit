@@ -81,7 +81,7 @@ Private inside FCC:
 Selective disclosure:
 
 - request commitment and coarse risk tier;
-- selected lender, amount, term, and winning APR;
+- selected lender, approved amount, and winning APR;
 - aggregate eligible quote count and FCC-signed result envelope.
 
 The prototype stores auction state in one TEE process. The contract pins an auction's follow-up operations to its selected machine, but encrypted authenticated state recovery remains production work. See [the threat model](docs/THREAT_MODEL.md) for the exact assumptions and exclusions.
@@ -90,13 +90,16 @@ The prototype stores auction state in one TEE process. The contract pins an auct
 
 - No real FXRP is moved by the hosted browser demo.
 - The Solidity funding and collateral-release functions are a scaffold, not a complete lending protocol: repayment, maturity, liquidation, KYC, and collections are out of scope.
-- The native FCC `ActionResult` path is exercised by the E2E runner; the separate EIP-191 relay surface still needs its custom `/sign` integration and signer setup before onchain use.
+- The E2E runner implements the native FCC `ActionResult` workflow; running the full proxy → TEE path requires the external infrastructure described above. The separate EIP-191 relay surface still needs its custom `/sign` integration and signer setup before onchain use.
 - The risk policy is illustrative and is not financial advice or a production underwriting model.
 - Persistent encrypted state, recovery, and multi-machine failover remain roadmap items.
 
 ## Built from Flare's official scaffold
 
 VeilCredit was built from Flare's `fce-extension-scaffold`. The upstream project supplied the FCC transport, registration/deployment scripts, and Hello World examples. VeilCredit adds the Go credit engine, encrypted auction schemas, matching/privacy logic, Solidity funding surface, tests, threat model, submission material, and interactive frontend.
+
+- [Judge evidence and exact deployment status](JUDGE_EVIDENCE.md)
+- [Public comparison from the scaffold base](https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...9bb36fb)
 
 - [Flare Confidential Compute overview](https://dev.flare.network/fcc/overview)
 - [FAssets overview](https://dev.flare.network/fassets/overview)
