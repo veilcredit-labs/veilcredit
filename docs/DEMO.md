@@ -1,11 +1,11 @@
 # Demo guide
 
-The interactive demo is designed to communicate the product even when a judge does not have a Coston2 wallet. It uses realistic deterministic sample data and labels simulated transitions clearly.
+The interactive demo is designed to communicate the product even when a judge does not have a Coston2 wallet. It uses deterministic sample data and labels simulated transitions clearly.
 
 ## Two-minute walkthrough
 
 1. Start on **Borrow** and review the default 250,000 FXRP request.
-2. Review the private-input labels and adjust the maximum APR if desired.
+2. Review the public/protected-field labels and adjust the private maximum APR if desired.
 3. Select **Simulate private request**. The browser-only walkthrough animates the intended encryption flow and three sealed sample quotes.
 4. Select **Reveal winner** when the simulated window closes.
 5. Confirm that the result reveals the selected lender and rate while every losing quote stays sealed.

@@ -8,7 +8,7 @@ VeilCredit is a prototype sealed-credit auction for FXRP. Its FCC extension eval
 
 **Bounty 2 — Confidential Compute Apps**
 
-VeilCredit is not a normal smart contract with privacy language around it. Its core product cannot work as intended on a transparent VM: borrower cash-flow data, maximum acceptable APR, lender liquidity, and losing quotes must remain secret while the selected result is still consumable by an onchain escrow.
+VeilCredit is not a normal smart contract with privacy language around it. Its core product cannot work as intended on a transparent VM: borrower cash-flow data, maximum acceptable APR, lender liquidity, and losing quotes must remain secret while the selected result is designed for eventual consumption by an onchain escrow.
 
 ## The problem
 
@@ -21,7 +21,7 @@ The same transparency problem hurts lenders. A public quote reveals their pricin
 
 ## The product
 
-VeilCredit runs a deterministic credit auction in an attested TEE:
+VeilCredit's Go extension implements a deterministic credit auction for FCC's attested TEE runtime:
 
 1. A borrower encrypts an underwriting packet to the selected FCC machine public key.
 2. The TEE decrypts it, validates the request, computes a reproducible risk score and commits to the packet without returning the raw financials.
@@ -90,7 +90,7 @@ VeilCredit makes its assumptions explicit:
 
 The official scaffold supplied the FCC transport, registration scripts, and a Hello World example. VeilCredit adds a hackathon reference implementation: encrypted credit request and quote schemas, risk engine, sealed matching logic, privacy-preserving state, lifecycle validation, an experimental funding contract surface, tests, interactive frontend, threat model, and submission assets.
 
-The comparison from the scaffold base to the submitted project is public at <https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...9bb36fb>.
+The comparison from the scaffold base to the current evidence branch is public at <https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...main>.
 
 ## Deployment status and evidence
 

@@ -75,10 +75,10 @@ The uniform quote acknowledgement is intentional: once a quote is structurally v
 
 The Foundry scenario verifies that the contract:
 
-- ABI-binds the public envelope to ciphertext;
+- ABI-encodes the public envelope together with ciphertext;
 - pins `OPEN`, `QUOTE`, and `FINALIZE` to one selected TEE;
 - binds a quote to its onchain caller;
-- enforces an immutable close time;
+- enforces the stored per-request close time;
 - blocks late quotes and premature finalization;
 - restricts finalization to the borrower.
 

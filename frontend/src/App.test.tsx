@@ -20,6 +20,12 @@ describe('VeilCredit demo', () => {
     expect(screen.getByText(/ready for private auction/i)).toBeInTheDocument()
     expect(screen.queryByText(/simulated lender/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/verified cash flow/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/public \+ protected fields/i)).toBeInTheDocument()
+    expect(screen.getByText('Borrower-declared cash flow')).toBeInTheDocument()
+    expect(screen.getByText(/demo values only/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/selective result/i)).not.toHaveLength(0)
+    expect(screen.queryByText(/cash flow proof/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/winner only/i)).not.toBeInTheDocument()
   }, 20_000)
 
   it('starts the encrypted submission flow', () => {

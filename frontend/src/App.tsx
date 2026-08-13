@@ -322,7 +322,7 @@ function App() {
                   <span className="panel__label"><Landmark size={14} /> Borrower brief</span>
                   <h2>Build your request</h2>
                 </div>
-                <span className="private-chip"><EyeOff size={13} /> Sealed in FCC flow</span>
+                <span className="private-chip"><EyeOff size={13} /> Public + protected fields</span>
               </div>
 
               <div className="form-grid">
@@ -415,7 +415,7 @@ function App() {
 
               <div className="verification-row">
                 <div><BadgeCheck size={17} /><span><strong>FXRP scenario</strong><small>Prototype asset flow</small></span></div>
-                <div><ShieldCheck size={17} /><span><strong>Cash flow proof</strong><small>Simulated in browser</small></span></div>
+                <div><ShieldCheck size={17} /><span><strong>Borrower-declared cash flow</strong><small>Demo values only</small></span></div>
               </div>
 
               <button
@@ -461,7 +461,7 @@ function App() {
                 </div>
                 <div>
                   <span>Disclosure</span>
-                  <strong className="privacy-score"><ShieldCheck size={16} /> Winner only</strong>
+                  <strong className="privacy-score"><ShieldCheck size={16} /> Selective result</strong>
                 </div>
               </div>
 

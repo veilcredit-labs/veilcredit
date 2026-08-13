@@ -5,9 +5,9 @@ A screenshot-ready, offline product demo for a confidential FXRP credit marketpl
 ## Included experience
 
 - Borrower request form with editable FXRP amount, collateral, revenue, debt, term, and maximum APR.
-- Simulated local encryption and sealed lender auction.
-- Three realistic private quotes and an interactive winner reveal.
-- TEE → attestation-ready result → experimental Flare funding relay architecture.
+- Browser-simulated encryption and a sealed lender-auction walkthrough.
+- Three deterministic sample quotes and an interactive selective-result reveal.
+- Intended TEE → FCC `ActionResult` → experimental Flare funding architecture.
 - Responsive layout for desktop, tablet, and mobile.
 - Explicit simulation labeling; no wallet, network, or external image dependency.
 
@@ -38,7 +38,7 @@ All interactions are deterministic and simulated in the browser. No funds or cre
 
 ## FCC integration map
 
-The UI fields map directly to the confidential extension wire format:
+The UI scenario mirrors the confidential extension's data model; the production wire path additionally uses ABI envelopes and ciphertext:
 
 - `OPEN`: `requestId`, `borrower`, `amountFxrp`, `collateralUsd`, `monthlyRevenueUsd`, `existingDebtUsd`, `termDays`, `maxAprBps`.
 - `QUOTE`: `lender`, `requestId`, `aprBps`, `liquidityFxrp`; quote rank remains sealed.
