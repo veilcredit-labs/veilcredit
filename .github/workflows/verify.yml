@@ -31,6 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
       - run: forge build --force --sizes
       - run: forge test -vv
 
@@ -44,6 +46,8 @@ jobs:
           go-version-file: tools/go.mod
           cache-dependency-path: tools/go.sum
       - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
       - name: Generate current contract bindings
         run: ./scripts/generate-bindings.sh
       - name: Test tooling

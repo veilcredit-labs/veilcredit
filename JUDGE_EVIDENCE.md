@@ -12,8 +12,9 @@ VeilCredit needs confidential compute because one deterministic policy compares 
 
 - Repository: <https://github.com/veilcredit-labs/veilcredit>
 - Public CI: <https://github.com/veilcredit-labs/veilcredit/actions/workflows/verify.yml>
-- Submitted base commit: `9bb36fb39faffb56d714becf1aa85d88783a130e`
-- Scaffold-to-project comparison: <https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...9bb36fb>
+- Evidence branch: `main`
+- CI introduction commit: `2754e323bb6e70bdd784930102f4084b77d3b842`
+- Scaffold-to-project comparison: <https://github.com/veilcredit-labs/veilcredit/compare/e3f5879...main>
 - Live walkthrough: <https://veilcredit.netlify.app>
 - DoraHacks BUIDL: <https://dorahacks.io/buidl/47788>
 
@@ -64,11 +65,11 @@ The final independent pre-submission run passed all commands above:
 | Instruction | Confidential input | Externally disclosed result |
 | --- | --- | --- |
 | `OPEN` | declared collateral value, monthly revenue, debt, term, maximum APR | request ID, prototype risk score, risk tier, maximum approved amount, commitment |
-| `QUOTE` | lender APR and liquidity | uniform `{requestId, received: true}` acknowledgement for every structurally valid quote |
+| `QUOTE` | lender APR and liquidity | uniform `{requestId, received: true}` acknowledgement for every structurally valid quote bound to an existing, open request |
 | `FINALIZE` | retained best eligible quote | borrower, selected lender, winning APR, approved amount, risk tier, commitment, eligible quote count |
 | `/state` | no request or quote record leaves the process | aggregate open-request, eligible-quote, and finalized-request counters only |
 
-The uniform quote acknowledgement is intentional: an eligible and an ineligible quote look the same externally, preventing binary search of the borrower's private APR ceiling. Only the best eligible quote is retained; losing prices and liquidity are discarded.
+The uniform quote acknowledgement is intentional: once a quote is structurally valid and bound to an existing, open request, an eligible and an ineligible quote look the same externally. This prevents binary search of the borrower's private APR ceiling. Only the best eligible quote is retained; losing prices and liquidity are discarded.
 
 ## Contract invariants exercised
 
